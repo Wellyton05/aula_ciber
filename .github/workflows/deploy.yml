@@ -16,6 +16,7 @@ on:
         options:
         - TST
         - PRD
+
 jobs:
   app_publish:
     runs-on: ubuntu-latest
@@ -26,36 +27,42 @@ jobs:
           version: "tags/${{ github.event.inputs.releasetag }}"
           file: 'backend.zip'
           token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Download Frontend
         uses: dsaltares/fetch-gh-release-asset@master
         with:
           version: "tags/${{ github.event.inputs.releasetag }}"
           file: 'frontend.zip'
           token: ${{ secrets.GITHUB_TOKEN }}
-      # Descompacta backend
-      - name: Descompact Zip
-        shell: bash
+
+      - name: Descompacta Zips
         run: |
-          mkdir backend
-          mkdir frontend
+          mkdir backend frontend
           unzip backend.zip -d backend
           unzip frontend.zip -d frontend
-      # SSH Key
+
+      - name: Extrai IP do destino
+        run: |
+          echo "HOST=$(echo ${{ secrets.URL_TST }} | sed 's/.*@//')" >> $GITHUB_ENV
+
       - name: Baixa KeyPair e Adiciona ao known_hosts
         run: |
-          echo "${{ secrets.KEYPAR_RSA }}" > keypair.pem
-          sudo chmod 400 keypair.pem
-          mkdir -p ~/.ssh/
-          echo $(echo ${{ secrets.URL_TST }} | sed 's/.*@//')
-          ssh-keyscan -H $(echo ${{ secrets.URL_TST }} | sed 's/.*@//') >> ~/.ssh/known_hosts
-          sudo chmod 600 ~/.ssh/known_hosts
-      #Atualiza em TST
+          set -e
+          # Cria chave privada de forma segura
+          printf '%s\n' "${{ secrets.KEYPAR_RSA }}" > keypair.pem
+          chmod 400 keypair.pem
+          
+          # Cria pasta SSH e adiciona host ao known_hosts
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
       - name: Atualiza em TST
         if: ${{ inputs.ambiente == 'TST' }}
         run: |
           rsync -e "ssh -i keypair.pem" -avz backend/* ${{ secrets.URL_TST }}:${{ secrets.PASTA_PROJETO }}/tst/backend
           rsync -e "ssh -i keypair.pem" -avz frontend/* ${{ secrets.URL_TST }}:${{ secrets.PASTA_PROJETO }}/tst/frontend
-      #Atualiza Produção
+
       - name: Atualiza em PRD
         if: ${{ inputs.ambiente == 'PRD' }}
         run: |
