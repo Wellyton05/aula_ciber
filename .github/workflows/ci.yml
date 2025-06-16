@@ -62,6 +62,7 @@ jobs:
 
   build_back:
     name: Build Back
+    needs: [GerarVersao]
     runs-on: ubuntu-latest
     steps:
       - name: Baixando o repositório
@@ -85,9 +86,28 @@ jobs:
         with:
           name: backend
           path: build/ci_cd_projeto/backend/backend.zip
+  
+  teste_back:
+    name: Teste
+    needs: [build_back]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixando o repositório
+        uses: actions/checkout@v4
+        with:
+          #repository: ${{ github.repository }}
+          #path: build
+          fetch-depth: 0
+      - name: Executar os testes automatizados
+        shell: bash
+        run: |
+          cd ci_cd_projeto/backend
+          npm install
+          npm run test:cov
 
   build_front:
     name: Build Front
+    needs: [GerarVersao]
     runs-on: ubuntu-latest
     steps:
       - name: Baixando o repositório
@@ -114,7 +134,7 @@ jobs:
 
   empacotar:
     name: Empacotar
-    needs: [build_back, build_front]
+    needs: [teste_back, build_front, GerarVersao]
     runs-on: ubuntu-latest
     steps:
      - name: Download Zip Frontend
@@ -134,5 +154,4 @@ jobs:
          tag_name: ${{ needs.GerarVersao.outputs.versao }}
          fail_on_unmatched_files: true
          files: backend.zip, frontend.zip
-
 
